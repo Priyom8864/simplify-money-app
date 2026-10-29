@@ -1,0 +1,91 @@
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+
+const navy = '#172033';
+const blue = '#173B68';
+
+export default function ExploreScreen() {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.brand}>SIMPLIFY MONEY</Text>
+      <Text style={styles.title}>Money insights</Text>
+      <Text style={styles.subtitle}>
+        Understand your money and build better habits.
+      </Text>
+
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>YOUR FINANCIAL HEALTH</Text>
+        <Text style={styles.heroTitle}>Small steps. Better finances.</Text>
+        <Text style={styles.heroText}>
+          Track spending, review transactions, and make informed decisions.
+        </Text>
+      </View>
+
+      <Text style={styles.section}>Build better habits</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.emoji}>📊</Text>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>Review your spending</Text>
+          <Text style={styles.cardText}>
+            Check your dashboard and identify where your money goes.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.emoji}>🎯</Text>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>Set a monthly budget</Text>
+          <Text style={styles.cardText}>
+            Choose a realistic spending limit and review it regularly.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.emoji}>💰</Text>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>Grow your savings</Text>
+          <Text style={styles.cardText}>
+            Set aside a manageable amount whenever you receive income.
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.footer}>Your money. Your plan. Your progress.</Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#F4F7FB' },
+  content: { padding: 22, paddingTop: 34, paddingBottom: 40 },
+  brand: { color: blue, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  title: { color: navy, fontSize: 29, fontWeight: '800', marginTop: 10 },
+  subtitle: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 8 },
+  hero: {
+    backgroundColor: blue,
+    borderRadius: 20,
+    padding: 22,
+    marginTop: 25,
+  },
+  heroLabel: { color: '#C9D9F2', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  heroTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginTop: 14 },
+  heroText: { color: '#E0E9F7', fontSize: 14, lineHeight: 21, marginTop: 9 },
+  section: { color: navy, fontSize: 19, fontWeight: '800', marginTop: 28, marginBottom: 13 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 17,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 13,
+  },
+  emoji: { fontSize: 25 },
+  cardBody: { flex: 1 },
+  cardTitle: { color: navy, fontSize: 15, fontWeight: '700' },
+  cardText: { color: '#667085', fontSize: 13, lineHeight: 20, marginTop: 6 },
+  footer: { color: '#667085', fontSize: 12, textAlign: 'center', marginTop: 20 },
+});

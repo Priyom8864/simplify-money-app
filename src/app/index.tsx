@@ -1,0 +1,501 @@
+
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+const API_URL = 'http://10.163.6.5:4010';
+
+type Transaction = {
+  id: string;
+  account_id: string;
+  occurred_at: string;
+  direction: 'debit' | 'credit';
+  amount_minor: number;
+  currency: string;
+  merchant: string;
+  category: string;
+  status: string;
+  updated_at: string;
+};
+
+type TransactionResponse = {
+  items: Transaction[];
+  next_cursor: string | null;
+  sync_token: string;
+};
+
+type MonthlySummary = {
+  spend: string;
+  income: string;
+  count: number;
+};
+
+type SummaryResponse = {
+  months: Record<string, MonthlySummary>;
+  computed_at: string;
+};
+
+function formatRupees(amount: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function formatCategory(value: string) {
+  return value
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+export default function HomeScreen() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedTransaction, setSelectedTransaction] =
+  useState<Transaction | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  async function fetchTransactions(cursor?: string) {
+    const params = new URLSearchParams({ limit: '50' });
+
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+
+    const response = await fetch(
+      `${API_URL}/v1/transactions?${params.toString()}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Transactions request failed (${response.status}).`);
+    }
+
+    return (await response.json()) as TransactionResponse;
+  }
+
+  async function loadDashboard() {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [transactionData, summaryResponse] = await Promise.all([
+        fetchTransactions(),
+        fetch(`${API_URL}/v1/summary/months`),
+      ]);
+
+      if (!summaryResponse.ok) {
+        throw new Error('Could not load the monthly summary.');
+      }
+
+      const summaryData =
+        (await summaryResponse.json()) as SummaryResponse;
+
+      setTransactions(transactionData.items);
+      setNextCursor(transactionData.next_cursor);
+      setSummary(summaryData.months['2026-10'] ?? null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong while loading your data.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError('');
+
+    try {
+      const page = await fetchTransactions(nextCursor);
+
+      setTransactions((current) => {
+        const knownIds = new Set(current.map((item) => item.id));
+        const newItems = page.items.filter(
+          (item) => !knownIds.has(item.id),
+        );
+
+        return [...current, ...newItems];
+      });
+
+      setNextCursor(page.next_cursor);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not load more transactions.',
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
+
+  const filteredTransactions = transactions.filter((transaction) =>
+    transaction.merchant.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+  <View>
+    <Text style={styles.eyebrow}>SIMPLIFY MONEY</Text>
+    <Text style={styles.title}>Your finances</Text>
+    <Text style={styles.subtitle}>October 2026</Text>
+  </View>
+  <TouchableOpacity onPress={() => setShowSettings(true)} style={{ backgroundColor: '#E8EFF9', padding: 10, borderRadius: 10 }}>
+    <Text style={{ color: '#172033', fontWeight: '700' }}>Settings</Text>
+  </TouchableOpacity>
+</View>
+{showSettings && (
+  <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 14, marginBottom: 16 }}>
+    <Text style={{ fontSize: 20, fontWeight: '700', color: '#172033', marginBottom: 12 }}>Settings</Text>
+    <Text style={{ color: '#667085', marginBottom: 16 }}>Simplify Money app settings</Text>
+    <TouchableOpacity onPress={() => setShowSettings(false)} style={{ backgroundColor: '#172033', padding: 12, borderRadius: 10, alignItems: 'center' }}>
+      <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Close Settings</Text>
+    </TouchableOpacity>
+  </View>
+)}
+
+        {summary && (
+          <View style={styles.balanceCard}>
+            <Text style={styles.cardLabel}>Monthly balance</Text>
+            <Text style={styles.balance}>
+              {formatRupees(Number(summary.income) - Number(summary.spend))}
+            </Text>
+
+            <View style={styles.summaryRow}>
+              <View>
+                <Text style={styles.cardLabel}>Income</Text>
+                <Text style={styles.income}>
+                  {formatRupees(Number(summary.income))}
+                </Text>
+              </View>
+
+              <View>
+                <Text style={styles.cardLabel}>Expenses</Text>
+                <Text style={styles.expense}>
+                  {formatRupees(Number(summary.spend))}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.transactionCount}>
+              {summary.count} transactions this month
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Transactions</Text>
+
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by merchant"
+          placeholderTextColor="#8B929C"
+          style={styles.search}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+
+        {loading ? (
+          <View style={styles.message}>
+            <ActivityIndicator size="large" color="#294B7A" />
+            <Text style={styles.messageText}>Loading transactions...</Text>
+          </View>
+        ) : error && transactions.length === 0 ? (
+          <View style={styles.message}>
+            <Text style={styles.error}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => void loadDashboard()}
+            >
+              <Text style={styles.buttonText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            {filteredTransactions.length === 0 ? (
+              <Text style={styles.empty}>
+                {search
+                  ? 'No matching transactions found.'
+                  : 'No transactions available.'}
+              </Text>
+            ) : (
+              filteredTransactions.map((transaction) => {
+                const isIncome = transaction.direction === 'credit';
+                const amount = transaction.amount_minor / 100;
+
+                return (
+                 <TouchableOpacity
+                   key={transaction.id}
+                   style={styles.transaction}
+                   activeOpacity={0.7}
+                   onPress={() => setSelectedTransaction(transaction)}
+                 >
+                    <View style={styles.transactionIcon}>
+                      <Text style={styles.iconText}>
+                        {transaction.merchant.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View style={styles.transactionInfo}>
+                      <Text style={styles.merchant}>
+                        {transaction.merchant}
+                      </Text>
+                      <Text style={styles.category}>
+                        {formatCategory(transaction.category)} ·{' '}
+                        {formatDate(transaction.occurred_at)}
+                      </Text>
+                    </View>
+
+                    
+          <Text
+            style={[
+              styles.amount,
+              isIncome ? styles.income : styles.amountNegative,
+            ]}
+          >
+            {isIncome ? '+' : '-'}
+            {formatRupees(amount)}
+          </Text>
+        </TouchableOpacity>
+
+                );
+              })
+            )}
+
+            {!search && nextCursor && (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={() => void loadMore()}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Load more</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </ScrollView>
+    {selectedTransaction && (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99, backgroundColor: '#F5F7FA', padding: 24, justifyContent: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: '700', color: '#172033', marginBottom: 24 }}>Transaction Details</Text>
+        <Text style={{ fontSize: 18, fontWeight: '600', color: '#172033', marginBottom: 12 }}>{selectedTransaction.merchant}</Text>
+        <Text style={{ fontSize: 15, color: '#667085', marginBottom: 10 }}>Category: {formatCategory(selectedTransaction.category)}</Text>
+        <Text style={{ fontSize: 15, color: '#667085', marginBottom: 10 }}>Date: {formatDate(selectedTransaction.occurred_at)}</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: '#172033', marginBottom: 24 }}>Amount: {formatRupees(Number(selectedTransaction.amount_minor) / 100)}</Text>
+        <TouchableOpacity onPress={() => setSelectedTransaction(null)} style={{ backgroundColor: '#172033', padding: 14, borderRadius: 10, alignItems: 'center' }}>
+          <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Close Details</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+  },
+  content: {
+    width: '100%',
+    maxWidth: 900,
+    alignSelf: 'center',
+    padding: 22,
+    paddingBottom: 40,
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.8,
+    color: '#667085',
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#172033',
+    marginTop: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#737D8C',
+    marginTop: 5,
+    marginBottom: 22,
+  },
+  balanceCard: {
+    backgroundColor: '#172E55',
+    borderRadius: 20,
+    padding: 22,
+  },
+  cardLabel: {
+    fontSize: 13,
+    color: '#C5D0E2',
+  },
+  balance: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#405476',
+    paddingTop: 18,
+  },
+  income: {
+    color: '#16865C',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  expense: {
+    color: '#FFD2CB',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  transactionCount: {
+    color: '#C5D0E2',
+    fontSize: 12,
+    marginTop: 18,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#172033',
+    marginTop: 28,
+    marginBottom: 14,
+  },
+  search: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E1E6ED',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    fontSize: 15,
+    marginBottom: 12,
+  },
+  transaction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  transactionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#EAF0FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  iconText: {
+    fontWeight: '700',
+    color: '#294B7A',
+    fontSize: 16,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  merchant: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#172033',
+  },
+  category: {
+    fontSize: 12,
+    color: '#7B8493',
+    marginTop: 5,
+  },
+  amount: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 8,
+    textAlign: 'right',
+  },
+  amountNegative: {
+    color: '#D44D45',
+  },
+  message: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    gap: 12,
+  },
+  messageText: {
+    color: '#667085',
+  },
+  error: {
+    color: '#B42318',
+    marginVertical: 12,
+  },
+  empty: {
+    textAlign: 'center',
+    color: '#737D8C',
+    marginTop: 24,
+  },
+  retryButton: {
+    backgroundColor: '#294B7A',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  loadMoreButton: {
+    backgroundColor: '#294B7A',
+    padding: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+});
